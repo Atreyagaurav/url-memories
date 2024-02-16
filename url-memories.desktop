@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=0.1
+Name=URL Memories
+Comment=Remember the URLS for episode/chapter based links
+# Path=
+Exec=url-memories
+# Icon=
+Terminal=false
+# Categories=
