@@ -1,13 +1,19 @@
+use dirs::data_local_dir;
 use gtk::{glib, prelude::*};
 use gtk::{Application, StringList, StringObject};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use string_template_plus::{Render, RenderOptions, Template};
+
+fn memory_path() -> PathBuf {
+    data_local_dir().unwrap().join(".url-memories")
+}
 
 #[derive(Debug)]
 struct AnimeEntry {
@@ -47,7 +53,20 @@ impl std::fmt::Display for AnimeEntry {
 }
 
 impl AnimeEntry {
-    fn get_url(&self, eps: u8) -> String {
+    fn new(title: String, url: &str, eps: String) -> Self {
+        Self {
+            category: "NA".to_string(),
+            title,
+            url_template: Template::parse_template(&url).unwrap(),
+            watched: eps,
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs(),
+        }
+    }
+
+    fn get_url(&self, eps: usize) -> String {
         let mut op = RenderOptions::default();
         op.variables.insert("episode".to_string(), eps.to_string());
         self.url_template.render(&op).unwrap()
@@ -69,18 +88,19 @@ trait FileIO {
 
 impl FileIO for HashMap<String, AnimeEntry> {
     fn load(&mut self) {
-        let mem_file = File::open(SAVE_FILEPATH).unwrap();
-        let mut lines = BufReader::new(mem_file).lines();
-        lines.next(); // discard header line;
-        let memories: HashMap<String, AnimeEntry> = lines
-            .filter_map(|line| AnimeEntry::from_str(&line.unwrap()).ok())
-            .map(|a| (a.title.clone(), a))
-            .collect();
-        self.extend(memories);
+        if let Ok(mem_file) = File::open(&memory_path()) {
+            let mut lines = BufReader::new(mem_file).lines();
+            lines.next(); // discard header line;
+            let memories: HashMap<String, AnimeEntry> = lines
+                .filter_map(|line| AnimeEntry::from_str(&line.unwrap()).ok())
+                .map(|a| (a.title.clone(), a))
+                .collect();
+            self.extend(memories);
+        }
     }
 
     fn save(&self) {
-        let mem_file = File::create(SAVE_FILEPATH).unwrap();
+        let mem_file = File::create(&memory_path()).unwrap();
         let mut writer = BufWriter::new(mem_file);
         writeln!(writer, "category,title,url_template,watched,timestamp").unwrap();
         for ent in self.values() {
@@ -97,8 +117,6 @@ fn main() -> anyhow::Result<()> {
     app.run();
     Ok(())
 }
-
-pub const SAVE_FILEPATH: &str = "/home/gaurav/.url-memories";
 
 pub fn build_ui(application: &gtk::Application) {
     let ui_src = include_str!("../resources/window.ui");
@@ -119,26 +137,38 @@ pub fn build_ui(application: &gtk::Application) {
         .expect("Couldn't get window");
     window.set_application(Some(application));
 
+    // watch tab
     load_ui!(dd_memory, gtk::DropDown);
     load_ui!(txt_eps, gtk::Entry);
+    load_ui!(txt_url, gtk::Entry);
     load_ui!(cb_open, gtk::CheckButton);
     load_ui!(btn_link, gtk::Button);
     load_ui!(btn_next, gtk::Button);
     load_ui!(btn_save, gtk::Button);
+    // add new tab
+    load_ui!(ent_title, gtk::Entry);
+    load_ui!(ent_url, gtk::Entry);
+    load_ui!(ent_eps, gtk::Entry);
+    load_ui!(btn_save_new, gtk::Button);
+
     btn_link.connect_clicked(
 	glib::clone!(@weak txt_eps, @weak dd_memory, @weak memories => move |_| {
-	let eps: u8 = number_range::NumberRangeOptions::default().with_range_sep('-').parse(&txt_eps.text()).unwrap().last().unwrap();
+	let eps: usize = number_range::NumberRangeOptions::default().with_range_sep('-').parse(&txt_eps.text()).unwrap().last().unwrap();
 	    let memory = dd_memory.selected_item().unwrap().downcast::<StringObject>().unwrap().string().to_string();
 	    open::that(memories.borrow().get(&memory).unwrap().get_url(eps)).unwrap();
         }));
 
     btn_next.connect_clicked(
-	glib::clone!(@weak txt_eps, @weak dd_memory, @weak cb_open, @weak memories => move |_| {
-	let mut eps: Vec<u8> = number_range::NumberRangeOptions::default().with_range_sep('-').parse(&txt_eps.text().to_string()).unwrap().collect();
+	glib::clone!(@weak txt_eps, @weak dd_memory, @weak cb_open, @weak txt_url, @weak memories => move |_| {
+	let mut eps: Vec<usize> = number_range::NumberRangeOptions::default().with_range_sep('-').parse(&txt_eps.text().to_string()).unwrap().collect();
 	    let memory = dd_memory.selected_item().unwrap().downcast::<StringObject>().unwrap().string().to_string();
 	    let next = eps[eps.len() - 1] + 1;
+	    let mems = memories.borrow();
+	    let mem = mems.get(&memory).unwrap();
+	    let url = mem.get_url(next);
+	    txt_url.set_text(&url);
 	    if cb_open.is_active(){
-		open::that(memories.borrow().get(&memory).unwrap().get_url(next)).unwrap();
+		open::that(url).unwrap();
 	    }
 	    eps.push(next);
 	    txt_eps.set_text(&number_range::NumberRangeOptions::default().with_range_sep('-').parse("").unwrap().from_vec(eps, Some(1)).to_string());
@@ -152,11 +182,31 @@ pub fn build_ui(application: &gtk::Application) {
 	    memories.borrow().save();
         }));
 
+    btn_save_new.connect_clicked(
+        glib::clone!(@weak ent_eps, @weak dd_memory, @weak ent_title, @weak ent_url, @weak memories  => move |_| {
+            let title = ent_title.text();
+            let url = ent_url.text();
+            let eps = ent_eps.text();
+            if !title.is_empty() && !url.is_empty() && !eps.is_empty() {
+		memories.borrow_mut().insert(title.to_string(), AnimeEntry::new(title.to_string(), &url, eps.to_string()));
+		memories.borrow().save();
+		ent_title.set_text("");
+		ent_url.set_text("");
+		ent_eps.set_text("");
+		let memlst: StringList = memories.borrow().keys().map(|a| a.to_string()).collect();
+		dd_memory.set_model(Some(&memlst));
+            }
+        }),
+    );
+
     dd_memory.connect_selected_item_notify(
-        glib::clone!(@weak txt_eps, @strong memories  => move |dd_memory| {
+        glib::clone!(@weak txt_eps, @weak txt_url, @strong memories  => move |dd_memory| {
             if let Some(memory) = dd_memory.selected_item().map( |i| i.downcast::<StringObject>().unwrap()){
-		let eps = memories.borrow().get(&memory.string().to_string()).unwrap().watched.clone();
-		txt_eps.set_text(&eps);
+		let mems = memories.borrow();
+		let mem = mems.get(&memory.string().to_string()).unwrap();
+		txt_eps.set_text(&mem.watched);
+		let last: usize = number_range::NumberRangeOptions::default().with_range_sep('-').parse(&txt_eps.text()).unwrap().last().unwrap();
+		txt_url.set_text(&mem.get_url(last));
             }}));
 
     memories.borrow_mut().load();

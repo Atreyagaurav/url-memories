@@ -6,4 +6,4 @@ Minimalistic UI. Text based history saved in a csv file.
 
 [[./screenshot.png]]
 
-*NOTE*: To add a new series you'll have to add the entry to the text file as there is no way to add them from the GUI yet.
+[[./screenshot2.png]]

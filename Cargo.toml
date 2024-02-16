@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"
+dirs = "5.0.1"
 gtk = { version = "0.7.3", package = "gtk4", features = ["v4_12"] }
 number_range = "0.3.2"
 open = "5.0.1"
