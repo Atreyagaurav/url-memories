@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <object class="GtkApplicationWindow" id="window">
+    <property name="title" translatable="1">URL Memories</property>
+    <property name="default-width">500</property>
+    <property name="default-height">40</property>
+    <property name="resizable">False</property>
+    <property name="child">
+      <object class="GtkBox">
+	<property name="margin-start">10</property>
+	<property name="margin-end">10</property>
+	<property name="margin-top">10</property>
+	<property name="margin-bottom">10</property>
+        <property name="orientation">vertical</property>
+	<property name="spacing">10</property>
+        <child>
+          <object class="GtkDropDown" id="dd_memory">
+            <property name="hexpand">False</property>
+	    <property name="enable-search">True</property>
+	    <property name="search-match-mode">substring</property>
+	    <property name="expression">
+	      <lookup type="GtkStringObject" name='string'></lookup>
+	    </property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkBox">
+	    <property name="spacing">10</property>
+            <child>
+              <object class="GtkEntry" id="txt_eps">
+                <property name="width-chars">6</property>
+                <property name="hexpand">1</property>
+                <property name="editable">False</property>
+              </object>
+            </child>
+	    <child>
+	      <object class="GtkCheckButton" id="cb_open">
+		<property name="label">Open</property>
+		<property name="valign">start</property>
+	      </object>
+	    </child>
+            <child>
+              <object class="GtkButton" id="btn_link">
+		<property name="label">Link</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="btn_next">
+		<property name="label">Next</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="btn_save">
+		<property name="label">Save</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </property>
+  </object>
+</interface>

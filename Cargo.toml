@@ -1,0 +1,15 @@
+[package]
+name = "ggtk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.79"
+gtk = { version = "0.7.3", package = "gtk4", features = ["v4_12"] }
+number_range = "0.3.2"
+open = "5.0.1"
+serde = { version = "1.0.196", features = ["derive"] }
+serde_derive = "1.0.196"
+string-template-plus = "0.4.3"
