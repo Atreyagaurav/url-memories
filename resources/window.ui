@@ -27,12 +27,6 @@
 		</property>
               </object>
             </child>
-	    <child>
-	      <object class="GtkEntry" id="txt_url">
-                <property name="hexpand">1</property>
-                <property name="editable">False</property>
-	      </object>
-	    </child>
             <child>
               <object class="GtkBox">
 		<property name="spacing">10</property>
@@ -40,7 +34,6 @@
 		  <object class="GtkEntry" id="txt_eps">
                     <property name="width-chars">6</property>
                     <property name="hexpand">1</property>
-                    <property name="editable">False</property>
 		  </object>
 		</child>
 		<child>
@@ -66,6 +59,21 @@
 		</child>
               </object>
             </child>
+            <child>
+              <object class="GtkBox">
+		<property name="spacing">10</property>
+		<child>
+		  <object class="GtkLabel">
+		    <property name="label">Note:</property>
+		  </object>
+		</child>
+		<child>
+		  <object class="GtkEntry" id="txt_note">
+                    <property name="hexpand">1</property>
+		  </object>
+		</child>
+	      </object>
+	    </child>
 	  </object>
 	</child>
 	

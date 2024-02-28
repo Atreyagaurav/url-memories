@@ -22,18 +22,20 @@ struct AnimeEntry {
     url_template: Template,
     watched: String,
     timestamp: u64,
+    note: String,
 }
 
 impl FromStr for AnimeEntry {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let cols: Vec<&str> = s.split(',').collect();
+        let cols: Vec<&str> = s.splitn(6, ',').collect();
         Ok(AnimeEntry {
             category: cols[0].to_string(),
             title: cols[1].to_string(),
             url_template: Template::parse_template(cols[2])?,
             watched: cols[3].to_string(),
             timestamp: cols[4].parse()?,
+            note: cols.get(5).unwrap_or(&"").to_string(),
         })
     }
 }
@@ -42,12 +44,13 @@ impl std::fmt::Display for AnimeEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{},{},{},{},{}",
+            "{},{},{},{},{},{}",
             self.category,
             self.title,
             self.url_template.original(),
             self.watched,
-            self.timestamp
+            self.timestamp,
+            self.note,
         )
     }
 }
@@ -63,6 +66,7 @@ impl AnimeEntry {
                 .duration_since(UNIX_EPOCH)
                 .expect("Time went backwards")
                 .as_secs(),
+            note: "".to_string(),
         }
     }
 
@@ -72,12 +76,17 @@ impl AnimeEntry {
         self.url_template.render(&op).unwrap()
     }
 
-    fn update(&mut self, eps: &str) {
+    fn get_note(&self) -> &str {
+        &self.note
+    }
+
+    fn update(&mut self, eps: &str, note: &str) {
         self.watched = eps.to_string();
         self.timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs();
+        self.note = note.to_string();
     }
 }
 
@@ -102,7 +111,7 @@ impl FileIO for HashMap<String, AnimeEntry> {
     fn save(&self) {
         let mem_file = File::create(&memory_path()).unwrap();
         let mut writer = BufWriter::new(mem_file);
-        writeln!(writer, "category,title,url_template,watched,timestamp").unwrap();
+        writeln!(writer, "category,title,url_template,watched,timestamp,note").unwrap();
         for ent in self.values() {
             writeln!(writer, "{}", ent).unwrap();
         }
@@ -140,7 +149,7 @@ pub fn build_ui(application: &gtk::Application) {
     // watch tab
     load_ui!(dd_memory, gtk::DropDown);
     load_ui!(txt_eps, gtk::Entry);
-    load_ui!(txt_url, gtk::Entry);
+    load_ui!(txt_note, gtk::Entry);
     load_ui!(cb_open, gtk::CheckButton);
     load_ui!(btn_link, gtk::Button);
     load_ui!(btn_next, gtk::Button);
@@ -159,14 +168,13 @@ pub fn build_ui(application: &gtk::Application) {
         }));
 
     btn_next.connect_clicked(
-	glib::clone!(@weak txt_eps, @weak dd_memory, @weak cb_open, @weak txt_url, @weak memories => move |_| {
+	glib::clone!(@weak txt_eps, @weak dd_memory, @weak cb_open, @weak txt_note, @weak memories => move |_| {
 	let mut eps: Vec<usize> = number_range::NumberRangeOptions::default().with_range_sep('-').parse(&txt_eps.text().to_string()).unwrap().collect();
 	    let memory = dd_memory.selected_item().unwrap().downcast::<StringObject>().unwrap().string().to_string();
 	    let next = eps[eps.len() - 1] + 1;
 	    let mems = memories.borrow();
 	    let mem = mems.get(&memory).unwrap();
 	    let url = mem.get_url(next);
-	    txt_url.set_text(&url);
 	    if cb_open.is_active(){
 		open::that(url).unwrap();
 	    }
@@ -175,10 +183,11 @@ pub fn build_ui(application: &gtk::Application) {
         }));
 
     btn_save.connect_clicked(
-	glib::clone!(@weak txt_eps, @weak dd_memory, @weak memories  => move |_| {
+	glib::clone!(@weak txt_eps, @weak dd_memory, @weak txt_note, @weak memories  => move |_| {
 	    let memory = dd_memory.selected_item().unwrap().downcast::<StringObject>().unwrap().string().to_string();
 	    let eps = txt_eps.text();
-	    memories.borrow_mut().get_mut(&memory).unwrap().update(&eps);
+	    let note = txt_note.text();
+	    memories.borrow_mut().get_mut(&memory).unwrap().update(&eps, &note);
 	    memories.borrow().save();
         }));
 
@@ -200,13 +209,12 @@ pub fn build_ui(application: &gtk::Application) {
     );
 
     dd_memory.connect_selected_item_notify(
-        glib::clone!(@weak txt_eps, @weak txt_url, @strong memories  => move |dd_memory| {
+        glib::clone!(@weak txt_eps, @weak txt_note, @strong memories  => move |dd_memory| {
             if let Some(memory) = dd_memory.selected_item().map( |i| i.downcast::<StringObject>().unwrap()){
 		let mems = memories.borrow();
 		let mem = mems.get(&memory.string().to_string()).unwrap();
 		txt_eps.set_text(&mem.watched);
-		let last: usize = number_range::NumberRangeOptions::default().with_range_sep('-').parse(&txt_eps.text()).unwrap().last().unwrap();
-		txt_url.set_text(&mem.get_url(last));
+		txt_note.set_text(&mem.get_note());
             }}));
 
     memories.borrow_mut().load();
