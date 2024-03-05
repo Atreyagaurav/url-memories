@@ -218,7 +218,12 @@ pub fn build_ui(application: &gtk::Application) {
             }}));
 
     memories.borrow_mut().load();
-    let memlst: StringList = memories.borrow().keys().map(|a| a.to_string()).collect();
+    let memlst: StringList = {
+        let mem = memories.borrow();
+        let mut sorted_al: Vec<&AnimeEntry> = mem.values().collect();
+        sorted_al.sort_by(|a, b| b.timestamp.partial_cmp(&a.timestamp).unwrap());
+        sorted_al.iter().map(|a| a.title.to_string()).collect()
+    };
     dd_memory.set_model(Some(&memlst));
 
     window.present();
